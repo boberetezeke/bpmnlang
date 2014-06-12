@@ -1,10 +1,26 @@
 grammar BPMNLang
   rule statements
-    optional_ws task (ws task)*  optional_ws <StatementsNode>
+    optional_ws statement (ws statement)*  optional_ws <StatementsNode>
+  end
+
+  rule statement
+    (task / in_order / in_parallel) <StatementNode>
+  end
+
+  rule in_order
+    'in_order' ws block <InOrderNode>
+  end
+
+  rule in_parallel
+    'in_parallel' ws block <InParallelNode>
   end
 
   rule task
     'task' ws symbol <TaskNode>
+  end
+
+  rule block
+    'do' ws (statement ws)* 'end' <BlockNode>
   end
 
   rule symbol

@@ -13,7 +13,7 @@ module BPMNLang
       elements[0]
     end
 
-    def task
+    def statement
       elements[1]
     end
   end
@@ -23,7 +23,7 @@ module BPMNLang
       elements[0]
     end
 
-    def task
+    def statement
       elements[1]
     end
 
@@ -47,7 +47,7 @@ module BPMNLang
     r1 = _nt_optional_ws
     s0 << r1
     if r1
-      r2 = _nt_task
+      r2 = _nt_statement
       s0 << r2
       if r2
         s3, i3 = [], index
@@ -56,7 +56,7 @@ module BPMNLang
           r5 = _nt_ws
           s4 << r5
           if r5
-            r6 = _nt_task
+            r6 = _nt_statement
             s4 << r6
           end
           if s4.last
@@ -89,6 +89,149 @@ module BPMNLang
     end
 
     node_cache[:statements][start_index] = r0
+
+    r0
+  end
+
+  def _nt_statement
+    start_index = index
+    if node_cache[:statement].has_key?(index)
+      cached = node_cache[:statement][index]
+      if cached
+        node_cache[:statement][index] = cached = SyntaxNode.new(input, index...(index + 1)) if cached == true
+        @index = cached.interval.end
+      end
+      return cached
+    end
+
+    i0 = index
+    r1 = _nt_task
+    if r1
+      r1 = SyntaxNode.new(input, (index-1)...index) if r1 == true
+      r0 = r1
+      r0.extend(StatementNode)
+    else
+      r2 = _nt_in_order
+      if r2
+        r2 = SyntaxNode.new(input, (index-1)...index) if r2 == true
+        r0 = r2
+        r0.extend(StatementNode)
+      else
+        r3 = _nt_in_parallel
+        if r3
+          r3 = SyntaxNode.new(input, (index-1)...index) if r3 == true
+          r0 = r3
+          r0.extend(StatementNode)
+        else
+          @index = i0
+          r0 = nil
+        end
+      end
+    end
+
+    node_cache[:statement][start_index] = r0
+
+    r0
+  end
+
+  module InOrder0
+    def ws
+      elements[1]
+    end
+
+    def block
+      elements[2]
+    end
+  end
+
+  def _nt_in_order
+    start_index = index
+    if node_cache[:in_order].has_key?(index)
+      cached = node_cache[:in_order][index]
+      if cached
+        node_cache[:in_order][index] = cached = SyntaxNode.new(input, index...(index + 1)) if cached == true
+        @index = cached.interval.end
+      end
+      return cached
+    end
+
+    i0, s0 = index, []
+    if (match_len = has_terminal?('in_order', false, index))
+      r1 = instantiate_node(SyntaxNode,input, index...(index + match_len))
+      @index += match_len
+    else
+      terminal_parse_failure('in_order')
+      r1 = nil
+    end
+    s0 << r1
+    if r1
+      r2 = _nt_ws
+      s0 << r2
+      if r2
+        r3 = _nt_block
+        s0 << r3
+      end
+    end
+    if s0.last
+      r0 = instantiate_node(InOrderNode,input, i0...index, s0)
+      r0.extend(InOrder0)
+    else
+      @index = i0
+      r0 = nil
+    end
+
+    node_cache[:in_order][start_index] = r0
+
+    r0
+  end
+
+  module InParallel0
+    def ws
+      elements[1]
+    end
+
+    def block
+      elements[2]
+    end
+  end
+
+  def _nt_in_parallel
+    start_index = index
+    if node_cache[:in_parallel].has_key?(index)
+      cached = node_cache[:in_parallel][index]
+      if cached
+        node_cache[:in_parallel][index] = cached = SyntaxNode.new(input, index...(index + 1)) if cached == true
+        @index = cached.interval.end
+      end
+      return cached
+    end
+
+    i0, s0 = index, []
+    if (match_len = has_terminal?('in_parallel', false, index))
+      r1 = instantiate_node(SyntaxNode,input, index...(index + match_len))
+      @index += match_len
+    else
+      terminal_parse_failure('in_parallel')
+      r1 = nil
+    end
+    s0 << r1
+    if r1
+      r2 = _nt_ws
+      s0 << r2
+      if r2
+        r3 = _nt_block
+        s0 << r3
+      end
+    end
+    if s0.last
+      r0 = instantiate_node(InParallelNode,input, i0...index, s0)
+      r0.extend(InParallel0)
+    else
+      @index = i0
+      r0 = nil
+    end
+
+    node_cache[:in_parallel][start_index] = r0
 
     r0
   end
@@ -140,6 +283,96 @@ module BPMNLang
     end
 
     node_cache[:task][start_index] = r0
+
+    r0
+  end
+
+  module Block0
+    def statement
+      elements[0]
+    end
+
+    def ws
+      elements[1]
+    end
+  end
+
+  module Block1
+    def ws
+      elements[1]
+    end
+
+  end
+
+  def _nt_block
+    start_index = index
+    if node_cache[:block].has_key?(index)
+      cached = node_cache[:block][index]
+      if cached
+        node_cache[:block][index] = cached = SyntaxNode.new(input, index...(index + 1)) if cached == true
+        @index = cached.interval.end
+      end
+      return cached
+    end
+
+    i0, s0 = index, []
+    if (match_len = has_terminal?('do', false, index))
+      r1 = instantiate_node(SyntaxNode,input, index...(index + match_len))
+      @index += match_len
+    else
+      terminal_parse_failure('do')
+      r1 = nil
+    end
+    s0 << r1
+    if r1
+      r2 = _nt_ws
+      s0 << r2
+      if r2
+        s3, i3 = [], index
+        loop do
+          i4, s4 = index, []
+          r5 = _nt_statement
+          s4 << r5
+          if r5
+            r6 = _nt_ws
+            s4 << r6
+          end
+          if s4.last
+            r4 = instantiate_node(SyntaxNode,input, i4...index, s4)
+            r4.extend(Block0)
+          else
+            @index = i4
+            r4 = nil
+          end
+          if r4
+            s3 << r4
+          else
+            break
+          end
+        end
+        r3 = instantiate_node(SyntaxNode,input, i3...index, s3)
+        s0 << r3
+        if r3
+          if (match_len = has_terminal?('end', false, index))
+            r7 = instantiate_node(SyntaxNode,input, index...(index + match_len))
+            @index += match_len
+          else
+            terminal_parse_failure('end')
+            r7 = nil
+          end
+          s0 << r7
+        end
+      end
+    end
+    if s0.last
+      r0 = instantiate_node(BlockNode,input, i0...index, s0)
+      r0.extend(Block1)
+    else
+      @index = i0
+      r0 = nil
+    end
+
+    node_cache[:block][start_index] = r0
 
     r0
   end
