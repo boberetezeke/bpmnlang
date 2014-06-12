@@ -1,0 +1,33 @@
+grammar BPMNLang
+  rule statements
+    optional_ws task (ws task)*  optional_ws <StatementsNode>
+  end
+
+  rule task
+    'task' ws symbol <TaskNode>
+  end
+
+  rule symbol
+    ':' identifier <SymbolNode>
+  end
+
+  rule identifier
+    identifier_start identifier_rest
+  end
+
+  rule identifier_start
+    [A-Za-z] <IdentifierStartNode>
+  end
+
+  rule identifier_rest
+    [A-Za-z0-9]* <IdentifierRestNode>
+  end
+
+  rule optional_ws
+    [ \t\n]*
+  end
+
+  rule ws
+    [ \t\n]+
+  end
+end
