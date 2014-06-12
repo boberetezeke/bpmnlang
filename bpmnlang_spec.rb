@@ -3,18 +3,47 @@ require './BPMNLang'
 include BPMNLang
 
 describe Runner do
+  def expect_match(node, node_spec, matches=[])
+    begin
+    node_spec.each_slice(2) do |klass, methods_and_values|
+      expect(node.is_a?(klass)).to eq(true)
+      matches.push([:is_a?, klass])
+      methods_and_values.each do |method, value|
+        #puts "method: #{method}, value: #{value}"
+        if value.is_a?(Array) && value.first.is_a?(Module)
+          new_nodes = node.send(method)
+          #puts "recurse"
+          value.each_slice(2) do |klass, methods_and_values2|
+            new_node = new_nodes.shift
+            #puts "new_node = #{new_node}"
+            expect_match(new_node, [klass, methods_and_values2], matches)
+          end
+        else
+          #puts "check value"
+          expect(node.send(method)).to eq(value)
+          matches.push([:method, value])
+        end
+      end
+    end
+    rescue Exception
+      puts "SUCCESSFUL matches: #{matches}"
+      raise
+    end
+  end
+
   context "when parsing statements" do
     it "should parse a simple task" do
       node = Runner.parse('task :task1')
 
-      #expect_match(node, [
-      #  StatementsNode, statements: [
-      #    
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      expect(node.statements.size).to eq(1)
-      task = node.statements.first
-      expect(task.is_a?(TaskNode)).to eq(true)
-      expect(task.name).to eq('task1')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            TaskNode, {
+              name: 'task1'  
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse a task with leading and trailing spaces" do
@@ -22,11 +51,15 @@ describe Runner do
         task :task1 
       EOT
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      expect(node.statements.size).to eq(1)
-      task = node.statements.first
-      expect(task.is_a?(TaskNode)).to eq(true)
-      expect(task.name).to eq('task1')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            TaskNode, {
+              name: 'task1'  
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse two tasks" do
@@ -35,13 +68,18 @@ describe Runner do
         task :task2 
       EOT
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      expect(node.statements.size).to eq(2)
-      task1, task2 = node.statements
-      expect(task1.is_a?(TaskNode)).to eq(true)
-      expect(task1.name).to eq('task1')
-      expect(task2.is_a?(TaskNode)).to eq(true)
-      expect(task2.name).to eq('task2')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            TaskNode, {
+              name: 'task1'  
+            },
+            TaskNode, {
+              name: 'task2'  
+            }
+          ]
+        }
+      ])
     end
   end
 
@@ -49,24 +87,33 @@ describe Runner do
     it "should parse an empty block" do
       node = Runner.parse('in_order do end')
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      in_order_node = node.statements.first
-      expect(in_order_node.is_a?(InOrderNode)).to eq(true)
-      in_order_block_statements = in_order_node.statements
-      expect(in_order_block_statements.size).to eq(0)
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            InOrderNode, {
+              statements: [] 
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse an in_order with a block with a task in it" do
       node = Runner.parse('in_order do task :task1 end')
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      in_order_node = node.statements.first
-      expect(in_order_node.is_a?(InOrderNode)).to eq(true)
-      in_order_block_statements = in_order_node.statements
-      expect(in_order_block_statements.size).to eq(1)
-      task = in_order_block_statements.first
-      expect(task.is_a?(TaskNode)).to eq(true)
-      expect(task.name).to eq('task1')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            InOrderNode, {
+              statements: [
+                TaskNode, {
+                  name: 'task1'
+                }
+              ]
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse an in_order with a block with two tasks in it" do
@@ -77,29 +124,40 @@ describe Runner do
         end
       EOT
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      in_order_node = node.statements.first
-      expect(in_order_node.is_a?(InOrderNode)).to eq(true)
-      in_order_block_statements = in_order_node.statements
-      expect(in_order_block_statements.size).to eq(2)
-      task1, task2 = in_order_block_statements
-      expect(task1.is_a?(TaskNode)).to eq(true)
-      expect(task1.name).to eq('task1')
-      expect(task2.is_a?(TaskNode)).to eq(true)
-      expect(task2.name).to eq('task2')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            InOrderNode, {
+              statements: [
+                TaskNode, {
+                  name: 'task1'
+                },
+                TaskNode, {
+                  name: 'task2'
+                }
+              ]
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse in_parallel with a block with a task in it" do
       node = Runner.parse('in_parallel do task :task1 end')
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      in_order_node = node.statements.first
-      expect(in_order_node.is_a?(InParallelNode)).to eq(true)
-      in_order_block_statements = in_order_node.statements
-      expect(in_order_block_statements.size).to eq(1)
-      task = in_order_block_statements.first
-      expect(task.is_a?(TaskNode)).to eq(true)
-      expect(task.name).to eq('task1')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            InParallelNode, {
+              statements: [
+                TaskNode, {
+                  name: 'task1'
+                }
+              ]
+            }
+          ]
+        }
+      ])
     end
 
     it "should parse an in_order block with a nested in_parallel block in it with a task" do
@@ -113,19 +171,26 @@ describe Runner do
         end
       EOT
 
-      expect(node.is_a?(StatementsNode)).to eq(true)
-      in_order_node = node.statements.first
-      expect(in_order_node.is_a?(InOrderNode)).to eq(true)
-      in_order_block_statements = in_order_node.statements
-      expect(in_order_block_statements.size).to eq(2)
-      task1, in_parallel = in_order_block_statements
-      expect(task1.is_a?(TaskNode)).to eq(true)
-      expect(task1.name).to eq('task1')
-      expect(in_parallel.is_a?(InParallelNode)).to eq(true)
-      expect(in_parallel.statements.size).to eq(1)
-      task2 = in_parallel.statements.first
-      expect(task2.is_a?(TaskNode)).to eq(true)
-      expect(task2.name).to eq('task2')
+      expect_match(node, [
+        StatementsNode, { 
+          statements: [ 
+            InOrderNode, {
+              statements: [
+                TaskNode, {
+                  name: 'task1'  
+                },
+                InParallelNode, {
+                  statements: [
+                    TaskNode, {
+                      name: 'task2'  
+                    },
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ])
     end
   end
 end
