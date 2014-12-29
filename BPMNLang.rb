@@ -224,7 +224,15 @@ module BPMNLang
           'xmlns:xsi' =>        'http://www.w3.org/2001/XMLSchema-instance',
           'xmlns:activiti' =>   'http://activiti.org/bpmn') do
 
-          xml.process 'id' =>   @process_node.name, 'name' => @process_node.description
+          xml.process 'id' =>   @process_node.name, 'name' => @process_node.description do
+            if @process_node.statements.size > 0
+              xml.startEvent 'id' => 'start'
+              @process_node.statements.each do |statement|
+                xml.userTask 'id' => statement.name
+              end
+              xml.endEvent 'id' => 'end1'
+            end
+          end
         end
       end.to_xml
 
