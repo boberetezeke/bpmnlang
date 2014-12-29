@@ -1,10 +1,22 @@
 grammar BPMNLang
+  rule process
+    optional_ws 'process' ws symbol ws block optional_ws <ProcessNode>
+  end
+
+  rule block
+    'do' ws (statement ws)* 'end' <BlockNode>
+  end
+
   rule statements
     optional_ws statement (ws statement)*  optional_ws <StatementsNode>
   end
 
   rule statement
-    (task / in_order / in_parallel) <StatementNode>
+    (task / in_order / in_parallel / if) <StatementNode>
+  end
+
+  rule if
+    'if' ws expression ws block <IfNode>
   end
 
   rule in_order
@@ -19,8 +31,42 @@ grammar BPMNLang
     'task' ws symbol <TaskNode>
   end
 
-  rule block
-    'do' ws (statement ws)* 'end' <BlockNode>
+  rule expression
+    ( '(' optional_ws expression optional_ws ')' / binary_expression / unary_expression) <ExpressionNode>
+  end
+
+  rule binary_expression
+    ( 
+      operand optional_ws binary_operator optional_ws expression / 
+      operand optional_ws binary_operator optional_ws operand 
+    ) <BinaryExpressionNode>
+  end
+
+  rule binary_operator
+    ('+' / '-' / '*' / '/' / '==' / '>' / '>=' / '<' / '<=') <BinaryOperatorNode>
+  end
+
+  rule unary_expression
+    ( 
+      unary_operator optional_ws expression /
+      unary_operator optional_ws operand 
+    ) <UnaryExpressionNode>
+  end
+
+  rule unary_operator
+    '!' <UnaryOperatorNode>
+  end
+
+  rule operand
+    (numeric_literal / string_literal / identifier) <OperandNode>
+  end
+
+  rule numeric_literal
+    [\d]+ <NumericLiteralNode>
+  end
+
+  rule string_literal
+    "'" [^']* "'" <StringLiteralNode> 
   end
 
   rule symbol

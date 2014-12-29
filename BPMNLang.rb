@@ -1,13 +1,40 @@
 require 'rubygems'
 require 'treetop'
+require 'polyglot'
 require './bpmnlang_parser'
 
 module BPMNLang
+  # -------------- modules ------------
+  module BlockMethods
+    def statements
+      elements
+    end
+  end
+
+  # ------------- nodes ----------------
+
+  module ProcessNode
+    include BlockMethods
+
+    def name
+      elements.first.name
+    end
+
+    def statements
+      s = []
+      self.elements.each_with_index do |element, index|
+        s.push(element) if element.is_a?(StatementNode)
+      end
+
+      s
+    end
+  end
+
   module StatementsNode
     def statements
       s = []
       self.elements.each_with_index do |element, index|
-        s.push(element)
+        s.push(element) if element.is_a?(StatementNode)
       end
 
       s
@@ -18,15 +45,43 @@ module BPMNLang
   end
 
   module InOrderNode
-    def statements
-      elements
-    end
+    include BlockMethods
   end
 
   module InParallelNode
-    def statements
-      elements
+    include BlockMethods
+  end
+
+  module IfNode
+    include BlockMethods
+
+    def evaluate
+      elements.map{|element| element.text_value}.join
     end
+  end
+
+  module ExpressionNode
+  end
+
+  module BinaryExpressionNode
+  end
+
+  module BinaryOperatorNode
+  end
+
+  module UnaryExpressionNode
+  end
+
+  module UnaryOperatorNode
+  end
+
+  module OperandNode
+  end
+
+  module NumericLiteralNode
+  end
+
+  module StringLiteralNode
   end
 
   module BlockNode
@@ -51,33 +106,43 @@ module BPMNLang
   end
 
   NODE_MODULES = [
-        StatementsNode, StatementNode, 
-        InOrderNode, InParallelNode, TaskNode, 
+        ProcessNode, StatementsNode, StatementNode, 
+        InOrderNode, InParallelNode, IfNode,
+        TaskNode, 
+        ExpressionNode, BinaryExpressionNode, UnaryExpressionNode, 
+        BinaryOperatorNode, UnaryOperatorNode,
+        NumericLiteralNode, StringLiteralNode,
         SymbolNode, IdentifierStartNode, IdentifierRestNode
       ]
 
   class Runner
-    def self.parse(text)
-      self.new.parse(text)
+    def self.parse(text, options={})
+      self.new.parse(text, options)
     end
 
     def initialize
       @parser = BPMNLangParser.new
     end
 
-    def parse(text)
+    def parse(text, options={})
       root_node = @parser.parse(text)
-      return nil unless root_node
-
-      root_node = clean_tree(root_node).first
-      #puts "-------------- DUMP ----------------"
-      #dump_tree(root_node)
-      #puts "----------------------------------"
+      if root_node.nil?
+        puts "--------- NO MATCH ---------"
+        puts @parser.failure_reason
+        puts "----------------------------"
+      else
+        root_node = clean_tree(root_node).first
+        if options[:dump]
+          puts "-------------- DUMP ----------------"
+          dump_tree(root_node)
+          puts "----------------------------------"
+        end
+      end
       root_node
     end
 
     def dump_tree(node, level=0)
-      puts((' ' * level) + matched_nodes(node).to_s) # + " elements: #{node.elements.size}")
+      puts((' ' * level) + matched_nodes(node).to_s) # + " elements: #{node.elements}")
       if node.elements
         node.elements.each do |element|
           dump_tree(element, level+2)
