@@ -2,6 +2,7 @@ require 'rubygems'
 require 'treetop'
 require 'polyglot'
 require './bpmnlang_parser'
+require 'nokogiri'
 
 module BPMNLang
   # -------------- modules ------------
@@ -18,6 +19,10 @@ module BPMNLang
 
     def name
       elements.first.name
+    end
+
+    def description
+      'process name'
     end
 
     def statements
@@ -202,6 +207,35 @@ module BPMNLang
           return [root_node]
         end
       end
+    end
+  end
+
+  class XmlGenerator
+    def initialize(process_node)
+      @process_node = process_node
+    end
+
+    def generate
+      Nokogiri::XML::Builder.new(encoding: 'UTF-8') do |xml|
+        xml.definitions( 
+          'id' =>               'definitions', 
+          'targetNamespace' =>  'http://activiti.org/bpmn20',
+          'xmlns' =>            'http://www.omg.org/spec/BPMN/20100524/MODEL',
+          'xmlns:xsi' =>        'http://www.w3.org/2001/XMLSchema-instance',
+          'xmlns:activiti' =>   'http://activiti.org/bpmn') do
+
+          xml.process 'id' =>   @process_node.name, 'name' => @process_node.description
+        end
+      end.to_xml
+
+=begin 
+      <?xml version="1.0" encoding="UTF-8" ?>
+      <definitions id="definitions"
+                   targetNamespace="http://activiti.org/bpmn20"
+                   xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns:activiti="http://activiti.org/bpmn">
+=end
     end
   end
 end
