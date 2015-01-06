@@ -1,76 +1,186 @@
 grammar BPMNLang
   rule process
-    optional_ws 'process' ws symbol ws block optional_ws <ProcessNode>
+    optional_ws 'process' ws symbol ws block optional_ws 
+
+    {
+      def ast 
+        Compiler::Process.new(symbol.ast, block.ast)
+      end
+    }
   end
 
   rule block
-    'do' ws (statement ws)* 'end' <BlockNode>
+    'do' ws statements:(s:statement ws)* 'end' 
+
+    {
+      def ast 
+        statements.elements.map{|e| e.s.ast}
+      end
+    }
   end
 
-  rule statements
-    optional_ws statement (ws statement)*  optional_ws <StatementsNode>
+  rule else_block
+    'do' ws statements:(s:statement ws)* 'else' 
+
+    {
+      def ast 
+        statements.elements.map{|e| e.s.ast}
+      end
+    }
   end
 
   rule statement
-    (task / in_order / in_parallel / if) <StatementNode>
+    t:task           { def ast; t.ast; end }
+    / i1:in_order    { def ast; i1.ast; end }
+    / i2:in_parallel { def ast; i2.ast; end }
+    / i3:if          { def ast; i3.ast; end }
+    / w:while        { def ast; w.ast; end }
   end
 
   rule if
-    'if' ws expression ws block <IfNode>
+    'if' ws e1:expression ws b1:block  
+    {
+      def ast
+        Compiler::If.new(e1.ast, b1.ast, nil)
+      end
+    }
+    / 
+    'if' ws e2:expression ws b2:else_block ws b3:block 
+    {
+      def ast
+        Compiler::If.new(e2.ast, b2.ast, b3.ast)
+      end
+    }
+  end
+
+  rule while
+    'while' bs:braced_statements? ws e:expression ws b:block 
+    {
+      def ast
+        Compiler::While.new(bs.empty? ? nil: bs.ast, e.ast, b.ast)
+      end
+    }
+  end
+
+  rule braced_statements
+    optional_ws '{' optional_ws statements:(s:statement ws)* '}'
+    {
+      def ast
+        if statements.empty?
+          nil
+        else
+          statements.elements.map{|e| e.s.ast}
+        end
+      end
+    }
   end
 
   rule in_order
-    'in_order' ws block <InOrderNode>
+    'in_order' ws block 
+    {
+      def ast
+        Compiler::InOrder.new(block.ast)
+      end
+    }
   end
 
   rule in_parallel
-    'in_parallel' ws block <InParallelNode>
+    'in_parallel' ws block 
+    {
+      def ast
+        Compiler::InParallel.new(block.ast)
+      end
+    }
   end
 
   rule task
-    'task' ws symbol <TaskNode>
+    'task' ws symbol 
+    {
+      def ast
+        Compiler::Task.new(symbol.ast)
+      end
+    }
   end
 
   rule expression
-    ( '(' optional_ws expression optional_ws ')' / binary_expression / unary_expression) <ExpressionNode>
+    '(' optional_ws e:expression optional_ws ')' 
+    {
+      def ast
+        e.ast
+      end
+    }
+    / b:binary_expression 
+    {
+      def ast
+        b.ast
+      end
+    }
+    / u:unary_expression
+    {
+      def ast
+        u.ast
+      end
+    }
   end
 
   rule binary_expression
-    ( 
-      operand optional_ws binary_operator optional_ws expression / 
-      operand optional_ws binary_operator optional_ws operand 
-    ) <BinaryExpressionNode>
+    o1:operand optional_ws binary_operator optional_ws e:expression 
+    {
+      def ast
+        Compiler::BinaryExpression.new(o1.text_value, binary_operator.text_value, e.ast)
+      end
+    }
+    / 
+    o1:operand optional_ws binary_operator optional_ws o2:operand 
+    {
+      def ast
+        Compiler::BinaryExpression.new(o1.text_value, binary_operator.text_value, o2.text_value)
+      end
+    }
   end
 
   rule binary_operator
-    ('+' / '-' / '*' / '/' / '==' / '>' / '>=' / '<' / '<=') <BinaryOperatorNode>
+    ('+' / '-' / '*' / '/' / '==' / '>' / '>=' / '<' / '<=') 
   end
 
   rule unary_expression
-    ( 
-      unary_operator optional_ws expression /
-      unary_operator optional_ws operand 
-    ) <UnaryExpressionNode>
+    unary_operator optional_ws expression 
+    {
+      def ast
+        Compiler::UnaryExpression.new(unary_operator.text_value, expression.ast)
+      end
+    }
+    / unary_operator optional_ws operand 
+    {
+      def ast
+        Compiler::UnaryExpression.new(unary_operator.text_value, expression.ast)
+      end
+    }
   end
 
   rule unary_operator
-    '!' <UnaryOperatorNode>
+    '!'
   end
 
   rule operand
-    (numeric_literal / string_literal / identifier) <OperandNode>
+    numeric_literal / string_literal / identifier
   end
 
   rule numeric_literal
-    [\d]+ <NumericLiteralNode>
+    [\d]+ 
   end
 
   rule string_literal
-    "'" [^']* "'" <StringLiteralNode> 
+    "'" [^']* "'" 
   end
 
   rule symbol
-    ':' identifier <SymbolNode>
+    ':' identifier 
+    {
+      def ast
+        Compiler::Symbol.new(identifier.text_value)
+      end
+    }
   end
 
   rule identifier
@@ -78,11 +188,11 @@ grammar BPMNLang
   end
 
   rule identifier_start
-    [A-Za-z] <IdentifierStartNode>
+    [A-Za-z]
   end
 
   rule identifier_rest
-    [A-Za-z0-9]* <IdentifierRestNode>
+    [A-Za-z0-9]*
   end
 
   rule optional_ws

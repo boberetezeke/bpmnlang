@@ -29,7 +29,7 @@ describe XmlGenerator do
 
 
   it "creates an empty process" do
-    xml = XmlGenerator.new(Runner.parse("process :p1 do end"))
+    xml = XmlGenerator.new(Runner.parse("process :p1 do end").ast)
     expect_xml_match(xml.generate,
       expected_definition_xml do <<-EOT
           <process id="p1" name="process name"/>
@@ -39,7 +39,7 @@ describe XmlGenerator do
   end
 
   it "creates a process with one task in it" do
-    xml = XmlGenerator.new(Runner.parse("process :p1 do task :task1 end"))
+    xml = XmlGenerator.new(Runner.parse("process :p1 do task :task1 end").ast)
     expect_xml_match(xml.generate,
       expected_definition_xml do <<-EOT
           <process id="p1" name="process name">
