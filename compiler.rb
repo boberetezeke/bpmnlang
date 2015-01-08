@@ -6,6 +6,16 @@ module Compiler
       @statements = statements
       @description = "process name"
     end
+
+    def generate
+      if @statements.empty?
+        []
+      else
+        [{type: :xml, xml: :startEvent, id: 'start'}] +
+        @statements.map{ |statement| statement.generate } + 
+        [{type: :xml, xml: :endEvent, id: 'end1'}]
+      end
+    end
   end
 
   class If
@@ -14,6 +24,19 @@ module Compiler
       @expression = expression
       @if_statements = if_statements
       @else_statements = else_statements
+    end
+
+    def generate
+      instruction = {
+        type: :exclusive_gateway, 
+        children_positive_instructions: @if_statements.map{|s| s.generate},
+        conditions: @expression.to_s
+      }
+      if @else_statements
+        instruction[:children_negative_instructions] = @else_statements.map{|s| s.generate}
+      end
+
+      instruction
     end
   end
 
@@ -45,6 +68,10 @@ module Compiler
     def initialize(name)
       @name = name
     end
+
+    def generate
+      {type: :xml, xml: :userTask, id: @name.identifier}
+    end
   end
 
   class BinaryExpression
@@ -53,6 +80,10 @@ module Compiler
       @left_operand = left_operand
       @operator = operator
       @right_operand = right_operand
+    end
+
+    def to_s
+      "#{@left_operand} #{@operator} #{@right_operand}"
     end
   end
 

@@ -44,12 +44,116 @@ describe XmlGenerator do
       expected_definition_xml do <<-EOT
           <process id="p1" name="process name">
             <startEvent id="start"/>
+            <sequenceFlow id="flow1" sourceRef="start" targetRef="task1"/>
             <userTask id="task1"/>
+            <sequenceFlow id="flow2" sourceRef="task1" targetRef="end1"/>
             <endEvent id="end1"/>
           </process>
         EOT
       end
     )
+  end
 
+  it "creates a process with an if statement and one task in it" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process :p1 do 
+        if 1 == 2 do
+          task :task1 
+        end
+      end
+    EOT
+
+    expect_xml_match(xml.generate,
+      expected_definition_xml do <<-EOT
+          <process id="p1" name="process name">
+            <startEvent id="start"/>
+            <sequenceFlow id="flow1" sourceRef="start" targetRef="gateway1"/>
+            <exclusiveGateway id="gateway1"/>
+            <sequenceFlow id="flow2" sourceRef="gateway1" targetRef="task1">
+              <conditionalExpression xsi:type="tFormalExpression">${1 == 2}</conditionalExpression>
+            </sequenceFlow>
+            <userTask id="task1"/>
+            <sequenceFlow id="flow3" sourceRef="gateway1" targetRef="end1">
+              <conditionalExpression xsi:type="tFormalExpression">${!(1 == 2)}</conditionalExpression>
+            </sequenceFlow>
+            <sequenceFlow id="flow4" sourceRef="task1" targetRef="end1"/>
+            <endEvent id="end1"/>
+          </process>
+        EOT
+      end
+    )
+  end
+
+  it "creates a process with an if statement and one task in it" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process :p1 do 
+        if 1 == 2 do
+          if 3 == 4 do
+            task :task1 
+          end
+        end
+      end
+    EOT
+
+    expect_xml_match(xml.generate,
+      expected_definition_xml do <<-EOT
+          <process id="p1" name="process name">
+            <startEvent id="start"/>
+            <sequenceFlow id="flow1" sourceRef="start" targetRef="gateway1"/>
+            <exclusiveGateway id="gateway1"/>
+            <sequenceFlow id="flow2" sourceRef="gateway1" targetRef="gateway2">
+              <conditionalExpression xsi:type="tFormalExpression">${1 == 2}</conditionalExpression>
+            </sequenceFlow>
+            <exclusiveGateway id="gateway2"/>
+            <sequenceFlow id="flow3" sourceRef="gateway2" targetRef="task1">
+              <conditionalExpression xsi:type="tFormalExpression">${3 == 4}</conditionalExpression>
+            </sequenceFlow>
+            <userTask id="task1"/>
+            <sequenceFlow id="flow4" sourceRef="gateway1" targetRef="end1">
+              <conditionalExpression xsi:type="tFormalExpression">${!(1 == 2)}</conditionalExpression>
+            </sequenceFlow>
+            <sequenceFlow id="flow5" sourceRef="gateway2" targetRef="end1">
+              <conditionalExpression xsi:type="tFormalExpression">${!(3 == 4)}</conditionalExpression>
+            </sequenceFlow>
+            <sequenceFlow id="flow6" sourceRef="task1" targetRef="end1"/>
+            <endEvent id="end1"/>
+          </process>
+        EOT
+      end
+    )
+  end
+
+  it "creates a process with an if statement with one task in it and an else statement with one task in it" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process :p1 do 
+        if 1 == 2 do
+          task :task1 
+        else do
+          task :task2 
+        end
+      end
+    EOT
+
+    expect_xml_match(xml.generate,
+      expected_definition_xml do <<-EOT
+          <process id="p1" name="process name">
+            <startEvent id="start"/>
+            <sequenceFlow id="flow1" sourceRef="start" targetRef="gateway1"/>
+            <exclusiveGateway id="gateway1"/>
+            <sequenceFlow id="flow2" sourceRef="gateway1" targetRef="task1">
+              <conditionalExpression xsi:type="tFormalExpression">${1 == 2}</conditionalExpression>
+            </sequenceFlow>
+            <userTask id="task1"/>
+            <sequenceFlow id="flow3" sourceRef="gateway1" targetRef="task2">
+              <conditionalExpression xsi:type="tFormalExpression">${!(1 == 2)}</conditionalExpression>
+            </sequenceFlow>
+            <userTask id="task2"/>
+            <sequenceFlow id="flow4" sourceRef="task1" targetRef="end1"/>
+            <sequenceFlow id="flow5" sourceRef="task2" targetRef="end1"/>
+            <endEvent id="end1"/>
+          </process>
+        EOT
+      end
+    )
   end
 end
