@@ -60,12 +60,12 @@ module BPMNLang
           'xmlns:activiti' =>   'http://activiti.org/bpmn') do
 
           xml.process 'id' =>   @process_node.name.identifier, 'name' => @process_node.description do
-            process_instructions(xml, @process_node.generate)
+            process_instructions(xml, @process_node.generate(self))
           end
         end
       end.to_xml
 
-      #puts "xml = #{x}"
+      debug 0, "xml = #{x}"
       x
 
 =begin 
@@ -78,63 +78,82 @@ module BPMNLang
 =end
     end
 
-    def process_instructions(xml, instructions, initial_previous_instructions=[], conditions=nil)
-      previous_instructions = initial_previous_instructions
-      #puts "previous instructions = #{previous_instructions}"
-      #puts "instructions = #{instructions}"
+    def process_instructions(xml, instructions, sequence_flows=[], options={})
+      level = options[:level] || 0
+
+      debug level, "process_instructions: instructions = #{instructions}"
+      debug level, "process_instructions: sequence_flows = #{sequence_flows}"
+      last_sequence_id = nil
+      super_sequence_flows = []
+
       instructions.each_with_index do |instruction, index|
         instruction_type = instruction.delete(:type)
         case instruction_type
         when :xml
           instruction_xml = instruction.delete(:xml)
           instruction_id =  instruction.delete(:id)
-          process_instruction(xml, instruction_xml, instruction_id, previous_instructions,
-                              instruction.merge(index == 0 && conditions ? {conditions: conditions} : {}))
 
-        when :exclusive_gateway
-          conditions = instruction.delete(:conditions) || {}
-          gateway_id = "gateway#{next_gateway_id}"
-          process_instruction(xml, :exclusiveGateway, gateway_id, previous_instructions)
+          next_statement_sequence_flows, sequence_flows = sequence_flows.partition{|i| i[:target] == :next || i[:target] == instruction_id}
+          next_statement_sequence_flows.each {|i| i[:target] = instruction_id}
 
-          children_positive_instructions = instruction.delete(:children_positive_instructions)
-          children_negative_instructions = instruction.delete(:children_negative_instructions)
-          
-          previous_instruction = previous_instructions.first.dup
-          previous_instructions += process_instructions(xml, children_positive_instructions, [previous_instruction.merge(conditions: conditions)])
-          if children_negative_instructions
-            # delete gateway as a previous instruction as that will go to the else case
-            previous_instructions.delete_if{|p| p[:id] == gateway_id}
-            previous_instructions += (process_instructions(xml, children_negative_instructions, [previous_instruction.merge(conditions:"!(#{conditions})")]))
-          else
-            # modify gateway as a previous instruction to add the negative condition to it
-            pi_gateway = previous_instructions.select{|p| p[:id] == gateway_id}.first
-            pi_gateway.merge!(conditions: "!(#{conditions})")
-            #puts "after if previous_instructions = #{previous_instructions}"
+          next_statement_sequence_flows.each do |sequence_flow|
+            process_sequence_flow(xml, sequence_flow, level)
           end
 
-        when :goto
+          debug level, "xml: #{instruction_xml}##{instruction_id}: options: #{instruction}"
+          xml.send(instruction_xml, {id: instruction_id}.merge(instruction))
+          last_sequence_id = instruction_id
+
+        when :instructions
+          debug level, "instructions: #{instruction[:instructions]}"
+          next_sub_instruction_sequence_flows, sequence_flows = sequence_flows.partition{|i| i[:target] == :next_sub_instruction}
+          debug level, "next_sub_instruction_sequence_flows = #{next_sub_instruction_sequence_flows}, sequence_flows = #{sequence_flows}"
+          last_sequence_id, new_sequence_flows = process_instructions(xml, instruction[:instructions], next_sub_instruction_sequence_flows.map{|i| i[:target] = :next; i}, level: level + 1)
+          debug level, "returned: last_sequence_id = #{last_sequence_id}"
+          sequence_flows += new_sequence_flows
+
+        when :sequence_flow
+          if instruction[:target] == :next_super_instruction
+            instruction[:target] = :next
+            super_sequence_flows.push(instruction)
+          elsif instruction[:target] == :next || instruction[:target] == :next_sub_instruction
+            sequence_flows.push(instruction)
+          else
+            if instruction[:source] == :prev
+              # if the instruction source is previous, then for each sequence flow queued up for
+              # next, change the target to the prev's target
+              next_sequence_flows, sequence_flows = sequence_flows.partition { |sf| sf[:target] == :next }
+              next_sequence_flows.each do |sf|
+                sf[:target] = instruction[:target]
+                process_sequence_flow(xml, sf, level)
+              end
+            else
+              process_sequence_flow(xml, instruction, level)
+            end
+          end
         end
       end
 
-      previous_instructions
+      debug level, "returning last_sequence_id=#{last_sequence_id}, sequence_flows=#{sequence_flows}"
+      return [last_sequence_id, sequence_flows + super_sequence_flows]
     end
 
-    def process_instruction(xml, message, id_val, previous_instructions, options={})
-      previous_instructions.each do |previous_instruction|
-        conditions = previous_instruction.delete(:conditions)
-        if conditions 
-          xml.sequenceFlow id: "flow#{next_flow_id}", sourceRef: previous_instruction[:id], targetRef: id_val do
-            xml.conditionalExpression  "${#{conditions}}", "xsi:type" => "tFormalExpression"
-          end
-        else
-          xml.sequenceFlow id: "flow#{next_flow_id}", sourceRef: previous_instruction[:id], targetRef: id_val
+    def process_sequence_flow(xml, sequence_flow, level)
+      flow_id = next_flow_id
+      debug level, "sequence_flow: #{flow_id}, source: #{sequence_flow[:source]}, target: #{sequence_flow[:target]}"
+      conditions = sequence_flow.delete(:conditions)
+      if conditions
+        debug level, "  with conditions: #{conditions}"
+        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target] do
+          xml.conditionalExpression  "${#{conditions}}", "xsi:type" => "tFormalExpression"
         end
+      else
+        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target]
       end
+    end
 
-      previous_instructions.clear
-
-      xml.send(message, {id: id_val}.merge(options))
-      previous_instructions.push({id: id_val})
+    def debug(level, str)
+      #puts "#{'  ' * level}#{str}"
     end
 
     def next_flow_id
