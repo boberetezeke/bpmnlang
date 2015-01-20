@@ -78,7 +78,7 @@ module BPMNLang
 =end
     end
 
-    def process_instructions(xml, instructions, sequence_flows=[], options={})
+    def process_instructions(xml, instructions, sequence_flows=[], symbol_table={}, options={})
       level = options[:level] || 0
 
       debug level, "process_instructions: instructions = #{instructions}"
@@ -93,8 +93,11 @@ module BPMNLang
           instruction_xml = instruction.delete(:xml)
           instruction_id =  instruction.delete(:id)
 
-          next_statement_sequence_flows, sequence_flows = sequence_flows.partition{|i| i[:target] == :next || i[:target] == instruction_id}
-          next_statement_sequence_flows.each {|i| i[:target] = instruction_id}
+          next_statement_sequence_flows, sequence_flows = sequence_flows.partition do |i| 
+            i[:target] == Target::NextInstruction.new || 
+            i[:target] == Target::ById.new(instruction_id)
+          end
+          next_statement_sequence_flows.each {|i| i[:target] = Target::ById.new(instruction_id)}
 
           next_statement_sequence_flows.each do |sequence_flow|
             process_sequence_flow(xml, sequence_flow, level)
@@ -104,33 +107,50 @@ module BPMNLang
           xml.send(instruction_xml, {id: instruction_id}.merge(instruction))
           last_sequence_id = instruction_id
 
+          # fill out symbols that are currently nil with current instruction_id
+          symbol_table.each do |symbol, value|
+            if value.nil?
+              debug level, "saving #{instruction_id} for symbol: #{symbol}"
+              symbol_table[symbol] = instruction_id 
+            end
+          end
+
         when :instructions
           debug level, "instructions: #{instruction[:instructions]}"
-          next_sub_instruction_sequence_flows, sequence_flows = sequence_flows.partition{|i| i[:target] == :next_sub_instruction}
+          next_sub_instruction_sequence_flows, sequence_flows = sequence_flows.partition{|i| i[:target] == Target::NextSubInstruction.new}
           debug level, "next_sub_instruction_sequence_flows = #{next_sub_instruction_sequence_flows}, sequence_flows = #{sequence_flows}"
-          last_sequence_id, new_sequence_flows = process_instructions(xml, instruction[:instructions], next_sub_instruction_sequence_flows.map{|i| i[:target] = :next; i}, level: level + 1)
+          last_sequence_id, new_sequence_flows = process_instructions(xml, instruction[:instructions], next_sub_instruction_sequence_flows.map{|i| i[:target] = Target::NextInstruction.new; i}, symbol_table, level: level + 1)
           debug level, "returned: last_sequence_id = #{last_sequence_id}"
           sequence_flows += new_sequence_flows
 
         when :sequence_flow
-          if instruction[:target] == :next_super_instruction
-            instruction[:target] = :next
+          target = instruction[:target]
+          if target == Target::NextSuperInstruction.new
+            instruction[:target] = Target::NextInstruction.new
             super_sequence_flows.push(instruction)
-          elsif instruction[:target] == :next || instruction[:target] == :next_sub_instruction
+          elsif target == Target::NextInstruction.new || target == Target::NextSubInstruction.new
             sequence_flows.push(instruction)
+          elsif target.is_a?(Target::Label)
+            debug level, "resolving #{symbol_table[target.name]} for symbol: #{target.name}"
+            instruction[:target] = Target::ById.new(symbol_table[target.name])
+            #sequence_flows.push(instruction)
+            process_sequence_flow(xml, instruction, level)
           else
             if instruction[:source] == :prev
               # if the instruction source is previous, then for each sequence flow queued up for
               # next, change the target to the prev's target
-              next_sequence_flows, sequence_flows = sequence_flows.partition { |sf| sf[:target] == :next }
+              next_sequence_flows, sequence_flows = sequence_flows.partition { |sf| sf[:target] == Target::NextInstruction.new }
               next_sequence_flows.each do |sf|
-                sf[:target] = instruction[:target]
+                sf[:target] = instruction[:target].dup
                 process_sequence_flow(xml, sf, level)
               end
             else
               process_sequence_flow(xml, instruction, level)
             end
           end
+
+        when :label
+          symbol_table[instruction[:name]] = nil
         end
       end
 
@@ -144,11 +164,11 @@ module BPMNLang
       conditions = sequence_flow.delete(:conditions)
       if conditions
         debug level, "  with conditions: #{conditions}"
-        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target] do
+        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target].id do
           xml.conditionalExpression  "${#{conditions}}", "xsi:type" => "tFormalExpression"
         end
       else
-        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target]
+        xml.sequenceFlow id: "flow#{flow_id}", sourceRef: sequence_flow[:source], targetRef: sequence_flow[:target].id
       end
     end
 

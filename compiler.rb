@@ -1,3 +1,5 @@
+require "./target"
+
 module Compiler
   module GeneratorMethods
     def statements_to_instructions(generator, statements, instructions=[])
@@ -27,7 +29,7 @@ module Compiler
       else
         [
           {type: :xml,            xml: :startEvent, id: 'start'},
-          {type: :sequence_flow,  source: 'start', target: :next_sub_instruction},
+          {type: :sequence_flow,  source: 'start', target: Target::NextSubInstruction.new},
           {type: :instructions,   instructions: statements_to_instructions(generator, @statements)},
           {type: :xml,            xml: :endEvent, id: 'end1'}
         ]
@@ -53,17 +55,17 @@ module Compiler
       conditions = @expression.to_s
       not_conditions = "!(#{conditions})"
       if @if_statements.size > 0
-        instructions.push({type: :sequence_flow, source: gateway_id, target: :next_sub_instruction, conditions: conditions })
+        instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextSubInstruction.new, conditions: conditions })
         instructions.push({type: :instructions, instructions: statements_to_instructions(generator, @if_statements)})
       else
-        instructions.push({type: :sequence_flow, source: gateway_id, target: :next, conditions: conditions })
+        instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextInstruction.new, conditions: conditions })
       end
 
       if @else_statements
-        instructions.push({type: :sequence_flow, source: gateway_id, target: :next_sub_instruction, conditions:  not_conditions })
+        instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextSubInstruction.new, conditions:  not_conditions })
         instructions.push({type: :instructions, instructions: statements_to_instructions(generator, @else_statements)})
       else
-        instructions.push({type: :sequence_flow, source: gateway_id, target: :next, conditions: not_conditions })
+        instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextInstruction.new, conditions: not_conditions })
       end
 
       instructions
@@ -83,20 +85,23 @@ module Compiler
     def generate(generator)
       gateway_id = "gateway#{generator.next_gateway_id}"
       exclusive_gateway = { type: :xml, xml: :exclusiveGateway, id: gateway_id }
+      label = { type: :label, name: :label1 }
       
       if @optional_statements
-        instructions = @optional_statements.map{|s| s.generate} + [exclusive_gateway]
+        instructions = [label] + statements_to_instructions(generator, @optional_statements) + [exclusive_gateway]
+        loop_target = Target::Label.new(:label1)
       else
         instructions = [exclusive_gateway]
+        loop_target = Target::ById.new(gateway_id)
       end
 
       conditions = expression.to_s
       not_conditions = "!(#{conditions})"
 
-      instructions.push({type: :sequence_flow, source: gateway_id, target: :next_sub_instruction, conditions:  conditions })
-      instructions.push({type: :sequence_flow, source: gateway_id, target: :next_super_instruction, conditions:  not_conditions })
+      instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextSubInstruction.new, conditions:  conditions })
+      instructions.push({type: :sequence_flow, source: gateway_id, target: Target::NextSuperInstruction.new, conditions:  not_conditions })
       instructions.push({type: :instructions, instructions: statements_to_instructions(generator, @statements)})
-      instructions.push({type: :sequence_flow, source: :prev, target: gateway_id })
+      instructions.push({type: :sequence_flow, source: :prev, target: loop_target })
       
       instructions
     end
@@ -127,7 +132,7 @@ module Compiler
     def generate(generator)
       [
         {type: :xml, xml: :userTask, id: @name.identifier},
-        {type: :sequence_flow, source: @name.identifier, target: :next}
+        {type: :sequence_flow, source: @name.identifier, target: Target::NextInstruction.new}
       ]
     end
   end

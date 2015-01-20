@@ -264,4 +264,36 @@ describe XmlGenerator do
       end
     )
   end
+
+  it "creates a process with while statements that have optional statements" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process :p1 do 
+        while {task :task1 } 1 == 2 do
+          task :task2 
+        end
+      end
+    EOT
+
+    expect_xml_match(xml.generate,
+      expected_definition_xml do <<-EOT
+          <process id="p1" name="process name">
+            <startEvent id="start"/>
+            <sequenceFlow id="flow1" sourceRef="start" targetRef="task1"/>
+            <userTask id="task1"/>
+            <sequenceFlow id="flow2" sourceRef="task1" targetRef="gateway1"/>
+            <exclusiveGateway id="gateway1"/>
+            <sequenceFlow id="flow3" sourceRef="gateway1" targetRef="task2">
+              <conditionalExpression xsi:type="tFormalExpression">${1 == 2}</conditionalExpression>
+            </sequenceFlow>
+            <userTask id="task2"/>
+            <sequenceFlow id="flow4" sourceRef="task2" targetRef="task1"/>
+            <sequenceFlow id="flow5" sourceRef="gateway1" targetRef="end1">
+              <conditionalExpression xsi:type="tFormalExpression">${!(1 == 2)}</conditionalExpression>
+            </sequenceFlow>
+            <endEvent id="end1"/>
+          </process>
+        EOT
+      end
+    )
+  end
 end
