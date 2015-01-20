@@ -124,7 +124,9 @@ module BPMNLang
           sequence_flows += new_sequence_flows
 
         when :sequence_flow
+          source = instruction[:source]
           target = instruction[:target]
+
           if target == Target::NextSuperInstruction.new
             instruction[:target] = Target::NextInstruction.new
             super_sequence_flows.push(instruction)
@@ -133,20 +135,23 @@ module BPMNLang
           elsif target.is_a?(Target::Label)
             debug level, "resolving #{symbol_table[target.name]} for symbol: #{target.name}"
             instruction[:target] = Target::ById.new(symbol_table[target.name])
-            #sequence_flows.push(instruction)
-            process_sequence_flow(xml, instruction, level)
-          else
-            if instruction[:source] == :prev
-              # if the instruction source is previous, then for each sequence flow queued up for
-              # next, change the target to the prev's target
-              next_sequence_flows, sequence_flows = sequence_flows.partition { |sf| sf[:target] == Target::NextInstruction.new }
-              next_sequence_flows.each do |sf|
-                sf[:target] = instruction[:target].dup
-                process_sequence_flow(xml, sf, level)
-              end
-            else
-              process_sequence_flow(xml, instruction, level)
+          end
+
+          # This needs to be after resolving the target so that queued up sequence flows can take
+          # their target from the current instruction's target
+          if source == :prev
+            # if the instruction source is previous, then for each sequence flow queued up for
+            # next, change the target to the prev's target
+            next_sequence_flows, sequence_flows = sequence_flows.partition { |sf| sf[:target] == Target::NextInstruction.new }
+            next_sequence_flows.each do |sf|
+              sf[:target] = instruction[:target].dup
+              process_sequence_flow(xml, sf, level)
             end
+          end
+
+          # if the sequence flow instruction is fully resolved
+          if instruction[:source] != :prev && instruction[:target].resolved?
+            process_sequence_flow(xml, instruction, level)
           end
 
         when :label
