@@ -63,7 +63,7 @@ grammar BPMNLang
   end
 
   rule braced_statements
-    optional_ws '{' optional_ws statements:(s:statement ws)* '}'
+    optional_ws '{' optional_ws statements:(s:statement ws)* optional_ws '}'
     {
       def ast
         if statements.empty?

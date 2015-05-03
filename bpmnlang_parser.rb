@@ -720,6 +720,10 @@ module BPMNLang
       elements[3]
     end
 
+    def optional_ws3
+      elements[4]
+    end
+
   end
 
   module BracedStatements2
@@ -784,14 +788,18 @@ module BPMNLang
           r4 = instantiate_node(SyntaxNode,input, i4...index, s4)
           s0 << r4
           if r4
-            if (match_len = has_terminal?('}', false, index))
-              r8 = true
-              @index += match_len
-            else
-              terminal_parse_failure('}')
-              r8 = nil
-            end
+            r8 = _nt_optional_ws
             s0 << r8
+            if r8
+              if (match_len = has_terminal?('}', false, index))
+                r9 = true
+                @index += match_len
+              else
+                terminal_parse_failure('}')
+                r9 = nil
+              end
+              s0 << r9
+            end
           end
         end
       end

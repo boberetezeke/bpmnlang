@@ -267,7 +267,7 @@ describe XmlGenerator do
 
   it "creates a process with while statements that have optional statements" do
     xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
-      process :p1 do 
+      process :p1 do
         while {task :task1 } 1 == 2 do
           task :task2 
         end
@@ -296,4 +296,31 @@ describe XmlGenerator do
       end
     )
   end
+
+
+=begin
+  it "creates a process with while statements that have optional statements" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process(:p1, numberOfDays:string) do 
+        p2(
+        while {task :task1 } 1 == 2 do
+          task :task2 
+        end
+      end
+    EOT
+  end
+
+  it "creates a process with while statements that have optional statements" do
+    xml = XmlGenerator.new(Runner.parse(<<-EOT).ast)
+      process(:p1, numberOfDays:string) 
+        doc(numberOfDays, "the number of days to ask for vacation")
+       do 
+        p2(
+        while {task :task1 } 1 == 2 do
+          task :task2 
+        end
+      end
+    EOT
+  end
+=end
 end

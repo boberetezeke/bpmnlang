@@ -6,18 +6,37 @@ module Target
   end
 
   class NextInstruction < Base
+    def resolved?
+      false
+    end
   end
 
   class NextSubInstruction < Base
+    def resolved?
+      false
+    end
   end
 
   class NextSuperInstruction < Base
+    def resolved?
+      false
+    end
+  end
+
+  class PrevSubInstruction < Base
+    def resolved?
+      false
+    end
   end
 
   class ById
     attr_reader :id
     def initialize(id)
       @id = id
+    end
+
+    def resolved?
+      true
     end
 
     def to_s
@@ -41,6 +60,10 @@ module Target
 
     def id=(id)
       @id = id
+    end
+
+    def resolved?
+      false
     end
 
     def to_s
